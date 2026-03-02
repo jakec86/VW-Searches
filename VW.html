@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CNY Market Intelligence — Cars.com</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        :root {
+            --jagger:#370B55; --violet:#8136B2; --vixen:#AB74CF;
+            --lavender:#D9BAEE; --gray:#4D4D4D; --white:#FFFFFF;
+        }
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{font-family:'Inter',sans-serif;background:#f0ecf5;color:var(--gray);height:100vh;overflow:hidden;}
+        #topbar{position:absolute;top:0;left:0;right:0;z-index:1100;height:62px;background:var(--jagger);display:flex;align-items:center;justify-content:space-between;padding:0 20px;box-shadow:0 2px 12px rgba(55,11,85,.45);}
+        #logo-subtitle{color:var(--lavender);font-size:12px;font-weight:500;letter-spacing:.8px;text-transform:uppercase;margin-left:15px;}
+        #total-badge{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 16px;text-align:right;}
+        #total-badge .num{font-size:18px;font-weight:700;color:var(--white);letter-spacing:-.5px;}
+        #total-badge .lbl{font-size:10px;color:var(--lavender);text-transform:uppercase;letter-spacing:1px;}
+        #map{width:100%;height:100vh;padding-top:62px;}
+        .panel{background:var(--white);border:1px solid #ddd;border-radius:10px;padding:14px 16px;box-shadow:0 2px 10px rgba(55,11,85,.12);position:absolute;}
+        .panel h3{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--violet);margin-bottom:10px;border-bottom:2px solid var(--lavender);padding-bottom:6px;}
+        #stats{bottom:24px;right:16px;z-index:1000;min-width:220px;}
+        .stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:11px;}
+        .stat-bar-wrap{width:100%;height:4px;background:#f0ecf5;border-radius:2px;margin-bottom:8px;}
+        .stat-bar{height:100%;border-radius:2px;background:linear-gradient(90deg,var(--jagger),var(--vixen));}
+        .cars-tooltip{background:var(--white)!important;border:1.5px solid var(--vixen)!important;border-radius:10px!important;color:var(--gray)!important;font-size:12px!important;padding:10px 14px!important;box-shadow:0 6px 18px rgba(55,11,85,.18)!important;}
+    </style>
+</head>
+<body>
+<div id="topbar">
+    <div style="display:flex; align-items:center;"><div style="font-weight: 800; font-size: 22px; color:white;">Cars<span style="color:var(--vixen)">.com</span></div><span id="logo-subtitle">CNY Market Intelligence</span></div>
+    <div id="total-badge"><div class="num" id="total-num">17,466</div><div class="lbl">Total Searches</div></div>
+</div>
+<div id="map"></div>
+<div id="stats" class="panel"><h3>Top 8 Cities</h3><div id="leaderboard"></div></div>
+
+<script>
+    const cities = [
+        {name:"Syracuse",total:5640,lat:43.0481,lng:-76.1474,zips:"14882"},
+        {name:"Oswego",total:1465,lat:43.4553,lng:-76.5105,zips:"13135"},
+        {name:"Ithaca",total:1192,lat:42.4440,lng:-76.5019,zips:"14886"},
+        {name:"Cicero",total:1162,lat:43.1759,lng:-76.1194,zips:"13148"},
+        {name:"Cortland",total:880,lat:42.5992,lng:-76.1783,zips:"13068, 14847"},
+        {name:"Oneida",total:800,lat:43.0906,lng:-75.6539,zips:"13354"},
+        {name:"Jamesville",total:667,lat:43.0031,lng:-76.0713,zips:"13120"},
+        {name:"Canastota",total:488,lat:43.0781,lng:-75.7513,zips:"13073"},
+        {name:"Hubbardsville",total:379,lat:42.8256,lng:-75.5205,zips:"13118"},
+        {name:"Clay",total:359,lat:43.1934,lng:-76.1841,zips:"13166"},
+        {name:"Pulaski",total:351,lat:43.5656,lng:-76.1260,zips:"14489"},
+        {name:"Central Square",total:337,lat:43.2848,lng:-76.1458,zips:"13461"},
+        {name:"South Lansing",total:330,lat:42.5451,lng:-76.5413,zips:"13316"},
+        {name:"Plainville",total:246,lat:43.1492,lng:-76.4013,zips:"13486"},
+        {name:"Trumansburg",total:214,lat:42.5412,lng:-76.6627,zips:"13160"},
+        {name:"Seneca Falls",total:207,lat:42.9106,lng:-76.7966,zips:"13114"}
+    ];
+
+    const map = L.map('map', {center:[43.05, -76.15], zoom:9, zoomControl:false, attributionControl:false});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    L.control.zoom({position:'topright'}).addTo(map);
+
+    const maxVal = cities[0].total;
+    const leaderboard = document.getElementById('leaderboard');
+    let grandTotal = 0;
+
+    cities.forEach((c, i) => {
+        grandTotal += c.total;
+        const r = Math.max(5, Math.sqrt(c.total) / 1.5); 
+        const circle = L.circleMarker([c.lat, c.lng], {
+            radius: r, fillColor: 'rgba(55, 11, 85, 0.72)', color: '#370B55', weight: 1.5, fillOpacity: 1
+        }).addTo(map);
+
+        circle.bindTooltip(`
+            <div style="font-weight:700;color:#370B55;font-size:14px;">${c.name}</div>
+            <div style="color:#8136B2;font-weight:600;">${c.total.toLocaleString()} searches</div>
+            <div style="font-size:10px;color:#888;margin-top:4px;">ZIPs: ${c.zips}</div>
+        `, {className:'cars-tooltip', sticky:true});
+
+        if (i < 8) {
+            const pct = (c.total / maxVal) * 100;
+            leaderboard.innerHTML += `
+                <div class="stat-row"><span>${c.name}</span><strong>${c.total.toLocaleString()}</strong></div>
+                <div class="stat-bar-wrap"><div class="stat-bar" style="width:${pct}%"></div></div>`;
+        }
+    });
+
+    document.getElementById('total-num').textContent = grandTotal.toLocaleString();
+</script>
+</body>
+</html>
